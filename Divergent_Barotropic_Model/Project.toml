@@ -1,0 +1,11 @@
+name = "Divergent_Barotropic_Model"
+uuid = "abb5b476-9038-4ab9-af0e-952fa7a28b35"
+authors = ["HSUAN-CHENG LIN <r12229008@ntu.edu.tw> and contributors"]
+version = "1.0.0-DEV"
+
+[deps]
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
