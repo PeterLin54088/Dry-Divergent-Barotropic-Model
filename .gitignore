@@ -1,0 +1,9 @@
+
+# HDF5
+*.jld2
+
+# log
+Log*
+
+# Jupyter Notebook
+.ipynb_checkpoints
