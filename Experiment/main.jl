@@ -2,7 +2,7 @@
 versioninfo()
 
 # Environment initialization
-import Pkg
+using Pkg: Pkg
 cd()
 Pkg.activate("Dynamical_Core/Divergent_Barotropic_Model")
 cd("Dynamical_Core")

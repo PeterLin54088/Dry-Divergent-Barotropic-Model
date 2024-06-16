@@ -7,8 +7,8 @@ TODO : Seperate SW and generalize method
 
 ################################################################################
 # Default package
-import FFTW
-import JLD2
+using FFTW: FFTW
+using JLD2: JLD2
 
 ################################################################################
 # Shared
