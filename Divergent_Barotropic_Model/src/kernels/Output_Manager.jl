@@ -1,9 +1,9 @@
 ################################################################################
-# Container
+# 
 export Output_Manager
-# Recording (with mutating)
+# 
 export Update_Output_Init!, Update_Output!, Finalize_Output!
-# HDF5 output
+# 
 export Generate_Output!
 # 
 export Display_Initial_Background!
@@ -49,6 +49,14 @@ mutable struct Output_Manager
     λc::Array{Float64, 1}
     θc::Array{Float64, 1}
     σc::Array{Float64, 1}
+
+    # Dataset (nλ × nθ × nd)
+    u_init::Array{Float64, 3}
+    v_init::Array{Float64, 3}
+    h_init::Array{Float64, 3}
+    q_init::Array{Float64, 3}
+    vor_init::Array{Float64, 3}
+    div_init::Array{Float64, 3}
     
     # Dataset (nλ × nθ × nd × n_hour)
     u_hourly_mean::Array{Float64, 4}
@@ -57,7 +65,7 @@ mutable struct Output_Manager
     q_hourly_mean::Array{Float64, 4}
     vor_hourly_mean::Array{Float64, 4}
     div_hourly_mean::Array{Float64, 4}
-    data_density1::Array{Int64, 1} # data counter
+    hourly_mean_counter::Array{Int64, 1} # data counter
     
     # Dataset (nλ × nθ × nd × n_day)
     u_daily_mean::Array{Float64, 4}
@@ -66,7 +74,7 @@ mutable struct Output_Manager
     q_daily_mean::Array{Float64, 4}
     vor_daily_mean::Array{Float64, 4}
     div_daily_mean::Array{Float64, 4}
-    data_density2::Array{Int64, 1} # data counter
+    daily_mean_counter::Array{Int64, 1} # data counter
     
 end
 
@@ -93,8 +101,8 @@ function Output_Manager(;mesh::Spectral_Spherical_Mesh,
     # Integrator
         # time
     current_time = start_time
-    n_hour = 1 + div(end_time - start_time, hour_to_sec) + 1
-    n_day = 1 + div(end_time - start_time, day_to_sec) + 1
+    n_hour = div(end_time - start_time, hour_to_sec)
+    n_day = div(end_time - start_time, day_to_sec)
     Δt = integrator.Δt
         # hyper diffusion
     damping_order = integrator.damping_order
@@ -106,6 +114,14 @@ function Output_Manager(;mesh::Spectral_Spherical_Mesh,
     θc = mesh.θc
     bk = vert_coord.bk
     σc = (bk[2:nd+1] + bk[1:nd])/2.0
+
+    # Dataset (nλ × nθ × nd)
+    u_init = zeros(Float64, nλ, nθ, nd)
+    v_init = zeros(Float64, nλ, nθ, nd)
+    h_init = zeros(Float64, nλ, nθ, 1)
+    q_init = zeros(Float64, nλ, nθ, nd)
+    vor_init = zeros(Float64, nλ, nθ, nd)
+    div_init = zeros(Float64, nλ, nθ, nd)
     
     # Dataset (nλ × nθ × nd × n_hour)
     u_hourly_mean = zeros(Float64, nλ, nθ, nd, n_hour)
@@ -114,7 +130,7 @@ function Output_Manager(;mesh::Spectral_Spherical_Mesh,
     q_hourly_mean = zeros(Float64, nλ, nθ, nd, n_hour)
     vor_hourly_mean = zeros(Float64, nλ, nθ, nd, n_hour)
     div_hourly_mean = zeros(Float64, nλ, nθ, nd, n_hour)
-    data_density1 = zeros(Int64, n_hour) # data counter
+    hourly_mean_counter = zeros(Int64, n_hour) # data counter
     
     # Dataset (nλ × nθ × nd × n_day)
     u_daily_mean = zeros(Float64, nλ, nθ, nd, n_day)
@@ -123,7 +139,7 @@ function Output_Manager(;mesh::Spectral_Spherical_Mesh,
     q_daily_mean = zeros(Float64, nλ, nθ, nd, n_day)
     vor_daily_mean = zeros(Float64, nλ, nθ, nd, n_day)
     div_daily_mean = zeros(Float64, nλ, nθ, nd, n_day)
-    data_density2 = zeros(Int64, n_day) # data counter
+    daily_mean_counter = zeros(Int64, n_day) # data counter
     
     ########################################################################
     output_manager = Output_Manager(creation_time, datapath,
@@ -138,15 +154,18 @@ function Output_Manager(;mesh::Spectral_Spherical_Mesh,
     ########################################################################
                                     λc, θc, σc,
     ########################################################################
+                                    u_init, v_init, h_init, q_init,
+                                    vor_init, div_init,
+    ########################################################################
                                     u_hourly_mean, v_hourly_mean, 
                                     h_hourly_mean, q_hourly_mean, 
                                     vor_hourly_mean, div_hourly_mean, 
-                                    data_density1,
+                                    hourly_mean_counter,
     ########################################################################
                                     u_daily_mean, v_daily_mean, 
                                     h_daily_mean, q_daily_mean, 
                                     vor_daily_mean, div_daily_mean, 
-                                    data_density2)
+                                    daily_mean_counter)
     ########################################################################
 end
 
@@ -158,6 +177,13 @@ function Update_Output_Init!(;output_manager::Output_Manager,
     Update outputs before any physical or dynamical process. 
     """
     @assert(current_time == output_manager.current_time)
+
+    u_init = output_manager.u_init
+    v_init = output_manager.v_init
+    h_init = output_manager.h_init
+    q_init = output_manager.q_init
+    vor_init = output_manager.vor_init
+    div_init = output_manager.div_init
     
     u_hourly_mean = output_manager.u_hourly_mean
     v_hourly_mean = output_manager.v_hourly_mean
@@ -165,7 +191,7 @@ function Update_Output_Init!(;output_manager::Output_Manager,
     q_hourly_mean = output_manager.q_hourly_mean
     vor_hourly_mean = output_manager.vor_hourly_mean
     div_hourly_mean = output_manager.div_hourly_mean
-    data_density1 = output_manager.data_density1
+    hourly_mean_counter = output_manager.hourly_mean_counter
     
     u_daily_mean = output_manager.u_daily_mean
     v_daily_mean = output_manager.v_daily_mean
@@ -173,9 +199,16 @@ function Update_Output_Init!(;output_manager::Output_Manager,
     q_daily_mean = output_manager.q_daily_mean
     vor_daily_mean = output_manager.vor_daily_mean
     div_daily_mean = output_manager.div_daily_mean
-    data_density2 = output_manager.data_density2
+    daily_mean_counter = output_manager.daily_mean_counter
 
     t_index = 1
+
+    u_init[:,:,:] .+= dyn_data.grid_u_c
+    v_init[:,:,:] .+= dyn_data.grid_v_c
+    h_init[:,:,1] .+= dyn_data.grid_ps_c[:,:,1]
+    q_init[:,:,:] .+= dyn_data.grid_q_c
+    vor_init[:,:,:] .+= dyn_data.grid_vor
+    div_init[:,:,:] .+= dyn_data.grid_div
     
     u_hourly_mean[:,:,:,t_index] .+= dyn_data.grid_u_c
     v_hourly_mean[:,:,:,t_index] .+= dyn_data.grid_v_c
@@ -183,7 +216,7 @@ function Update_Output_Init!(;output_manager::Output_Manager,
     q_hourly_mean[:,:,:,t_index] .+= dyn_data.grid_q_c
     vor_hourly_mean[:,:,:,t_index] .+= dyn_data.grid_vor
     div_hourly_mean[:,:,:,t_index] .+= dyn_data.grid_div
-    data_density1[t_index] += 1
+    hourly_mean_counter[t_index] += 1
     
     u_daily_mean[:,:,:,t_index] .+= dyn_data.grid_u_c
     v_daily_mean[:,:,:,t_index] .+= dyn_data.grid_v_c
@@ -191,7 +224,7 @@ function Update_Output_Init!(;output_manager::Output_Manager,
     q_daily_mean[:,:,:,t_index] .+= dyn_data.grid_q_c
     vor_daily_mean[:,:,:,t_index] .+= dyn_data.grid_vor
     div_daily_mean[:,:,:,t_index] .+= dyn_data.grid_div
-    data_density2[t_index] += 1
+    daily_mean_counter[t_index] += 1
 end
 
 
@@ -212,7 +245,7 @@ function Update_Output!(;output_manager::Output_Manager,
     q_hourly_mean = output_manager.q_hourly_mean
     vor_hourly_mean = output_manager.vor_hourly_mean
     div_hourly_mean = output_manager.div_hourly_mean
-    data_density1 = output_manager.data_density1
+    hourly_mean_counter = output_manager.hourly_mean_counter
     
     u_daily_mean = output_manager.u_daily_mean
     v_daily_mean = output_manager.v_daily_mean
@@ -220,26 +253,26 @@ function Update_Output!(;output_manager::Output_Manager,
     q_daily_mean = output_manager.q_daily_mean
     vor_daily_mean = output_manager.vor_daily_mean
     div_daily_mean = output_manager.div_daily_mean
-    data_density2 = output_manager.data_density2
+    daily_mean_counter = output_manager.daily_mean_counter
 
-    t_index1 = 1 + div(current_time - start_time, hour_to_sec) + 1
-    t_index2 = 1 + div(current_time - start_time, day_to_sec) + 1
+    t_index_hourly = 1 + div(current_time - start_time, hour_to_sec)
+    t_index_daily = 1 + div(current_time - start_time, day_to_sec)
     
-    u_hourly_mean[:,:,:,t_index1] .+= dyn_data.grid_u_c
-    v_hourly_mean[:,:,:,t_index1] .+= dyn_data.grid_v_c
-    h_hourly_mean[:,:,1,t_index1] .+= dyn_data.grid_ps_c[:,:,1]
-    q_hourly_mean[:,:,:,t_index1] .+= dyn_data.grid_q_c
-    vor_hourly_mean[:,:,:,t_index1] .+= dyn_data.grid_vor
-    div_hourly_mean[:,:,:,t_index1] .+= dyn_data.grid_div
-    data_density1[t_index1] += 1
+    u_hourly_mean[:,:,:,t_index_hourly] .+= dyn_data.grid_u_c
+    v_hourly_mean[:,:,:,t_index_hourly] .+= dyn_data.grid_v_c
+    h_hourly_mean[:,:,1,t_index_hourly] .+= dyn_data.grid_ps_c[:,:,1]
+    q_hourly_mean[:,:,:,t_index_hourly] .+= dyn_data.grid_q_c
+    vor_hourly_mean[:,:,:,t_index_hourly] .+= dyn_data.grid_vor
+    div_hourly_mean[:,:,:,t_index_hourly] .+= dyn_data.grid_div
+    hourly_mean_counter[t_index_hourly] += 1
     
-    u_daily_mean[:,:,:,t_index2] .+= dyn_data.grid_u_c
-    v_daily_mean[:,:,:,t_index2] .+= dyn_data.grid_v_c
-    h_daily_mean[:,:,1,t_index2] .+= dyn_data.grid_ps_c[:,:,1]
-    q_daily_mean[:,:,:,t_index2] .+= dyn_data.grid_q_c
-    vor_daily_mean[:,:,:,t_index2] .+= dyn_data.grid_vor
-    div_daily_mean[:,:,:,t_index2] .+= dyn_data.grid_div
-    data_density2[t_index2] += 1
+    u_daily_mean[:,:,:,t_index_daily] .+= dyn_data.grid_u_c
+    v_daily_mean[:,:,:,t_index_daily] .+= dyn_data.grid_v_c
+    h_daily_mean[:,:,1,t_index_daily] .+= dyn_data.grid_ps_c[:,:,1]
+    q_daily_mean[:,:,:,t_index_daily] .+= dyn_data.grid_q_c
+    vor_daily_mean[:,:,:,t_index_daily] .+= dyn_data.grid_vor
+    div_daily_mean[:,:,:,t_index_daily] .+= dyn_data.grid_div
+    daily_mean_counter[t_index_daily] += 1
     
     output_manager.current_time = current_time
 end
@@ -255,16 +288,16 @@ function Finalize_Output!(;output_manager::Output_Manager)
     q_hourly_mean = output_manager.q_hourly_mean
     vor_hourly_mean = output_manager.vor_hourly_mean
     div_hourly_mean = output_manager.div_hourly_mean
-    data_density1 = output_manager.data_density1
+    hourly_mean_counter = output_manager.hourly_mean_counter
     
     for time = 1:output_manager.n_hour
-        u_hourly_mean[:,:,:,time] ./= data_density1[time]
-        v_hourly_mean[:,:,:,time] ./= data_density1[time]
-        h_hourly_mean[:,:,1,time] ./= data_density1[time]
-        q_hourly_mean[:,:,:,time] ./= data_density1[time]
-        vor_hourly_mean[:,:,:,time] ./= data_density1[time]
-        div_hourly_mean[:,:,:,time] ./= data_density1[time]
-        data_density1[time] = 1
+        u_hourly_mean[:,:,:,time] ./= hourly_mean_counter[time]
+        v_hourly_mean[:,:,:,time] ./= hourly_mean_counter[time]
+        h_hourly_mean[:,:,1,time] ./= hourly_mean_counter[time]
+        q_hourly_mean[:,:,:,time] ./= hourly_mean_counter[time]
+        vor_hourly_mean[:,:,:,time] ./= hourly_mean_counter[time]
+        div_hourly_mean[:,:,:,time] ./= hourly_mean_counter[time]
+        hourly_mean_counter[time] = 1
     end
     
     u_daily_mean = output_manager.u_daily_mean
@@ -273,16 +306,16 @@ function Finalize_Output!(;output_manager::Output_Manager)
     q_daily_mean = output_manager.q_daily_mean
     vor_daily_mean = output_manager.vor_daily_mean
     div_daily_mean = output_manager.div_daily_mean
-    data_density2 = output_manager.data_density2
+    daily_mean_counter = output_manager.daily_mean_counter
     
     for time = 1:output_manager.n_day
-        u_daily_mean[:,:,:,time] ./= data_density2[time]
-        v_daily_mean[:,:,:,time] ./= data_density2[time]
-        h_daily_mean[:,:,1,time] ./= data_density2[time]
-        q_daily_mean[:,:,:,time] ./= data_density2[time]
-        vor_daily_mean[:,:,:,time] ./= data_density2[time]
-        div_daily_mean[:,:,:,time] ./= data_density2[time]
-        data_density2[time] = 1
+        u_daily_mean[:,:,:,time] ./= daily_mean_counter[time]
+        v_daily_mean[:,:,:,time] ./= daily_mean_counter[time]
+        h_daily_mean[:,:,1,time] ./= daily_mean_counter[time]
+        q_daily_mean[:,:,:,time] ./= daily_mean_counter[time]
+        vor_daily_mean[:,:,:,time] ./= daily_mean_counter[time]
+        div_daily_mean[:,:,:,time] ./= daily_mean_counter[time]
+        daily_mean_counter[time] = 1
     end
 end
 

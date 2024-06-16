@@ -21,7 +21,7 @@ function Shallow_Water_Main(;model_name::String = "Shallow_Water",
         # Time mark
     creation_time = Dates.format(Dates.now(), "yyyy_mmdd_HHMMSS")
         # Path
-    datapath, logpath = filepath_constructor(creation_time)
+    datapath, logpath = filepath_constructor(time = creation_time)
         # File
     JLD2.jldopen(datapath, "w+") do file
         # 
@@ -192,7 +192,7 @@ function Shallow_Water_Main(;model_name::String = "Shallow_Water",
     
     ########################################
     ### Simulation stage
-    while (integrator.time+Δt) <= end_time
+    while (integrator.time+Δt) < end_time
         # 1
         Shallow_Water_Physics!(dyn_data = dyn_data, 
                                kappa_chi = kappa_chi, 
@@ -233,10 +233,10 @@ function Shallow_Water_Main(;model_name::String = "Shallow_Water",
     return nothing
 end
 
-function filepath_constructor(time::String,
+function filepath_constructor(;name =nothing, time = nothing,
                               default_path = "Experiment/output/")
     """
-    
+    TODO
     """
     
     if isdir(default_path)
@@ -244,15 +244,33 @@ function filepath_constructor(time::String,
     else
         mkdir(default_path)
     end
-    
-    # Dataset
-    data_prefix = "Datasets_"
-    data_suffix = ".jld2" # JLD2 package
-    datapath = default_path * data_prefix * time * data_suffix
-    # Log
-    log_prefix = "Logs_"
-    log_suffix = ".txt"
-    logpath = default_path * log_prefix * time * log_suffix
-    
+    if isnothing(name) & isnothing(time)
+        # Dataset
+        data_prefix = "Datasets_"
+        data_suffix = ".jld2" # JLD2 package
+        datapath = default_path * data_prefix * "Undefined" * data_suffix
+        # Log
+        log_prefix = "Logs_"
+        log_suffix = ".txt"
+        logpath = default_path * log_prefix * "Undefined" * log_suffix
+    elseif isnothing(time)
+        # Dataset
+        data_prefix = "Datasets_"
+        data_suffix = ".jld2" # JLD2 package
+        datapath = default_path * data_prefix * name * data_suffix
+        # Log
+        log_prefix = "Logs_"
+        log_suffix = ".txt"
+        logpath = default_path * log_prefix * name * log_suffix
+    else
+        # Dataset
+        data_prefix = "Datasets_"
+        data_suffix = ".jld2" # JLD2 package
+        datapath = default_path * data_prefix * time * data_suffix
+        # Log
+        log_prefix = "Logs_"
+        log_suffix = ".txt"
+        logpath = default_path * log_prefix * time * log_suffix
+    end
     return datapath, logpath
 end
