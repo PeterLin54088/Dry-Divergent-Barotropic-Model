@@ -43,7 +43,7 @@ function Shallow_Water_Main(; model_name::String="Shallow_Water",
 
     # Time
     start_time = 0
-    end_time = 86400 * 5
+    end_time = 86400 * 15
     Δt = 60
 
     # Convective efficiency
@@ -188,6 +188,13 @@ function Shallow_Water_Main(; model_name::String="Shallow_Water",
     Update_Output_Init!(; output_manager=output_manager,
                         dyn_data=dyn_data,
                         current_time=integrator.time)
+    Display_Current_State!(; logpath=logpath,
+                           tick=div(integrator.time, hour_to_sec),
+                           grid_u=grid_u,
+                           grid_v=grid_v,
+                           grid_h=grid_h,
+                           grid_vor=grid_vor,
+                           grid_div=grid_div)
 
     ########################################
     ### Simulation stage
@@ -223,7 +230,6 @@ function Shallow_Water_Main(; model_name::String="Shallow_Water",
                                    grid_div=grid_div)
         end
     end
-
     ########################################
     ### Output stage
     Finalize_Output!(; output_manager=output_manager)

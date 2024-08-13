@@ -1,5 +1,5 @@
 # Version
-versioninfo()
+# versioninfo()
 
 # Environment initialization
 using Pkg: Pkg
